@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>譽富國際報價單 (V2.7 最終修復版)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; --internal: #fff7ed; --internal-border: #fdba74; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
+        .container { max-width: 1350px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        
+        /* 標題與連線狀態 */
+        h2 { border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; color: var(--primary); display: flex; justify-content: space-between; align-items: center; min-height: 40px; }
+        .sync-badge { font-size: 12px; background: #eee; padding: 4px 10px; border-radius: 20px; color: #666; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+        .dot.ok { background: #10b981; box-shadow: 0 0 5px #10b981; }
+        .dot.err { background: #ef4444; }
+        .dot.loading { background: #eab308; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+        /* 表單樣式 */
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-size: 12px; font-weight: bold; color: #64748b; margin-bottom: 5px; }
+        input, select, textarea { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+        
+        /* 聯絡人標籤樣式 */
+        .contact-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; min-height: 25px; }
+        .c-tag { background: #dbeafe; color: #1e40af; padding: 2px 10px; border-radius: 15px; font-size: 13px; display: flex; align-items: center; gap: 8px; border: 1px solid #bfdbfe; }
+        .c-tag span { cursor: pointer; font-weight: bold; color: #ef4444; font-size: 14px; }
+        .c-tag span:hover { color: #b91c1c; }
+
+        /* 按鈕 */
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; margin-right: 5px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-purple { background: #8b5cf6; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-outline { background: white; border: 1px solid #cbd5e1; color: #475569; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+
+        /* 列表與篩選 */
+        .filter-bar { background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; border: 1px solid #bae6fd; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th { text-align: left; background: #e2e8f0; padding: 10px; cursor: pointer; user-select: none; }
+        th:hover { background: #cbd5e1; }
+        td { border-bottom: 1px solid #e2e8f0; padding: 10px; }
+        tr:hover { background: #f8fafc; }
+        .sort-icon { font-size: 10px; margin-left: 5px; color: #666; }
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; color: white; font-weight: bold; }
+        .bg-green { background: #10b981; }
+        .bg-gray { background: #94a3b8; }
+
+        /* 報價明細 (修改欄位寬度以容納成本利潤) */
+        .item-grid-layout { 
+            display: grid; 
+            /* 調整欄位：品名, 規格, 長, 寬, 單位, 才, 量, [成本], [利潤], 單價, 金額, 刪除 */
+            grid-template-columns: 2fr 1fr 0.5fr 0.5fr 0.5fr 0.4fr 0.5fr 0.7fr 0.7fr 0.7fr 0.7fr 0.3fr; 
+            gap: 5px; align-items: center; 
+        }
+        .item-header { 
+            background: #64748b; color: white; padding: 8px 5px; 
+            border-radius: 6px 6px 0 0; font-size: 13px; font-weight: bold; text-align: center;
+            margin-bottom: 5px;
+        }
+        .item-header div { text-align: center; }
+        .item-header div:nth-child(1), .item-header div:nth-child(2) { text-align: left; padding-left: 5px; }
+        .item-row { margin-bottom: 5px; }
+        
+        /* 內部成本欄位樣式 */
+        .internal-col { background-color: var(--internal) !important; border-color: var(--internal-border) !important; color: #c2410c; }
+        .profit-col { background-color: var(--internal) !important; border-color: var(--internal-border) !important; color: #15803d; font-weight: bold; }
+
+        .total-section { text-align: right; font-size: 18px; font-weight: bold; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #cbd5e1; }
+        .internal-total { font-size: 14px; color: #c2410c; margin-right: 15px; background: #fff7ed; padding: 5px 10px; border-radius: 4px; border: 1px solid #fdba74; }
+
+        /* 預覽與列印 */
+        #previewOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 9998; }
+        #previewModal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; background: white; box-shadow: 0 10px 40px rgba(0,0,0,0.3); border-radius: 8px; max-height: 90vh; overflow-y: auto; padding: 20px; border: 1px solid #ccc; }
+
+        /* A4 列印樣式 */
+        #printArea { display: none; width: 210mm; min-height: 297mm; padding: 15mm; background: white; color: black; box-sizing: border-box; font-family: "Microsoft JhengHei", sans-serif; position: relative; }
+        .print-header { text-align: center; margin-bottom: 20px; border-bottom: 3px double #000; padding-bottom: 15px; }
+        .company-title { font-size: 26px; font-weight: bold; letter-spacing: 3px; margin-bottom: 5px; }
+        .company-info { font-size: 13px; line-height: 1.5; }
+        .quote-info-grid { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; }
+        .info-row { margin-bottom: 5px; display: flex; }
+        .info-label { font-weight: bold; width: 80px; }
+        .print-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+        .print-table th { background: #f0f0f0; border: 1px solid #000; padding: 6px; text-align: center; }
+        .print-table td { border: 1px solid #000; padding: 6px; }
+        
+        .signature-section { display: flex; justify-content: space-between; margin-top: 40px; }
+        .sign-box { 
+            width: 45%; border-bottom: 1px solid #000; padding-bottom: 10px; 
+            position: relative; min-height: 120px; 
+            display: flex; flex-direction: column; justify-content: flex-start;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .sign-box:hover { background: rgba(0,0,0,0.02); }
+        .sign-title { font-weight: bold; font-size: 15px; margin-bottom: 5px; z-index: 20; position: relative; }
+        .sign-placeholder { color: #ccc; text-align: center; margin-top: auto; margin-bottom: 10px; pointer-events: none; }
+        
+        .stamp-img { 
+            position: absolute; top: 55%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-3deg); 
+            width: 140px; opacity: 0.95; z-index: 10;
+            mix-blend-mode: multiply;
+        }
+        .stamp-alt-text { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; color: #999; text-align: center; border: 1px dashed #ccc; padding: 5px; width: 80%; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printArea, #printArea * { visibility: visible; }
+            #printArea { display: block !important; position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; border: none; }
+            .no-print { display: none !important; }
+            .sign-box:hover { background: none; }
+            .stamp-alt-text { display: none !important; }
+        }
+
+        /* 材料資料庫視窗 */
+        .mat-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10002; justify-content:center; align-items:center; }
+        .mat-content { background:white; width:900px; max-width:95%; height:85vh; padding:20px; border-radius:8px; display:flex; flex-direction:column; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .mat-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px; }
+        .mat-form-row { display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 80px; gap:10px; align-items:end; background:#f8fafc; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #e2e8f0; }
+        .mat-table-container { flex:1; overflow-y:auto; border:1px solid #eee; border-radius:4px; }
+        .mat-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .mat-table th { position:sticky; top:0; background:#e2e8f0; padding:8px; text-align:left; font-weight:bold; color:#475569; }
+        .mat-table td { padding:8px; border-bottom:1px solid #eee; }
+        .mat-table tr:hover { background:#f1f5f9; }
+        .profit-high { color: #16a34a; font-weight:bold; } 
+        .profit-low { color: #dc2626; font-weight:bold; } 
+
+        /* AI & Modal */
+        .price-analysis-card { position: absolute; z-index: 9999; width: 350px; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid #e2e8f0; font-family: "Microsoft JhengHei", sans-serif; overflow: hidden; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }        
+        .ai-wrapper { position: relative; display: flex; align-items: center; width: 100%; }
+        .btn-ai-analyze { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 18px; color: #8b5cf6; z-index: 100; padding: 2px; transition: transform 0.2s; }
+        .btn-ai-analyze:hover { transform: translateY(-50%) scale(1.2); }
+        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; }
+        .modal-content-sm { background: white; padding: 20px; border-radius: 8px; width: 400px; max-width:90%; }
+    </style>
+</head>
+<body>
+
+<div id="previewOverlay" onclick="closePreview()"></div>
+<div id="previewModal"></div>
+<div id="printArea"></div>
+
+<div id="configModal" class="modal">
+    <div class="modal-content-sm">
+        <h3 style="margin-top:0;">⚙️ 雲端連線設定</h3>
+        <p style="font-size:12px; color:#666;">請輸入 Google Apps Script 部署網址 (Exec URL)</p>
+        <input type="text" id="apiUrlInput" placeholder="https://script.google.com/..." style="width:100%; margin-bottom:15px;">
+        <div style="text-align:right;">
+            <button class="btn btn-outline" onclick="document.getElementById('configModal').style.display='none'">取消</button>
+            <button class="btn btn-primary" onclick="saveConfig()">連線</button>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="stampLoader" hidden accept="image/*" onchange="loadStampManual(this)">
+
+<div class="container no-print">
+    <h2>
+        <span>譽富國際 (V2.7)</span>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <div class="sync-badge" onclick="openConfigModal()" style="cursor:pointer;" title="點擊設定連線">
+                <div id="cloudDot" class="dot loading"></div>
+                <span id="cloudText">啟動中...</span>
+            </div>
+            <button class="btn btn-outline" onclick="exportData()">📥 備份JSON</button>
+            <button class="btn btn-purple" onclick="openMatModal()">🛠️ 材料/商品庫</button>
+            <input type="file" id="importFile" style="display:none" onchange="importData(this)">
+            <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📤 還原JSON</button>
+            <button class="btn btn-outline" onclick="syncCloudData()">🔄 強制整理</button>
+        </div>
+    </h2>
+
+    <details>
+        <summary style="cursor:pointer; font-weight:bold; color:var(--primary); margin-bottom:15px; padding:10px; background:#f0f9ff; border-radius:6px;">➕ 新增/編輯 報價單 (點擊展開)</summary>
+        <form id="quoteForm" onsubmit="event.preventDefault(); saveQuote();" style="border:1px solid #e2e8f0; padding:20px; border-radius:8px;">
+            <input type="hidden" id="q_id">
+            
+            <div class="form-grid">
+                <div class="form-group"><label>日期</label><input type="date" id="q_date" required></div>
+                <div class="form-group"><label>有效期限</label><input type="date" id="q_valid"></div>
+                <div class="form-group"><label>專案名稱</label><input type="text" id="q_proj" required placeholder="例如：招牌製作"></div>
+                
+                <div class="form-group">
+                    <label>客戶名稱 (搜尋/同步)</label>
+                    <input type="text" id="q_cust" list="cloudCustList" placeholder="輸入自動帶出地址與聯絡人..." onchange="autoFillCust(this.value)" required>
+                </div>
+                
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>聯絡人 (人名+電話 多選)</label>
+                    <div id="contactTags" class="contact-tags"></div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr 40px; gap:5px;">
+                        <input type="text" id="q_contact_name" list="custContactList" placeholder="聯絡人 (選取後自動帶入電話)" oninput="autoFillContactPhone(this.value)">
+                        <input type="text" id="q_contact_phone" placeholder="電話 (可手動修改)">
+                        <button type="button" class="btn btn-success btn-sm" onclick="addContactTag()">+</button>
+                    </div>
+                </div>
+
+                <div class="form-group"><label>公司電話</label><input type="text" id="q_phone" placeholder="公司總機"></div>
+                <div class="form-group"><label>統編</label><input type="text" id="q_tax_id"></div>
+                <div class="form-group" style="grid-column: span 2;"><label>地址 (可回存)</label><input type="text" id="q_address" placeholder="客戶地址"></div>
+            </div>
+
+            <div style="background:#f8fafc; padding:10px; border-radius:6px; border:1px solid #e2e8f0; margin-bottom:15px;">
+                <label style="color:var(--primary); margin-bottom:10px; display:block;">報價明細</label>
+                <div class="item-grid-layout item-header">
+                    <div>項目</div><div>規格</div><div>長(cm)</div><div>寬(cm)</div><div>單位</div>
+                    <div>才數</div><div>數量</div>
+                    <div style="color:#fdba74;">成本(單)</div>
+                    <div style="color:#22c55e;">毛利</div>
+                    <div>單價</div><div>金額</div><div></div>
+                </div>
+                <div id="itemContainer"></div>
+                <button type="button" class="btn btn-success btn-sm" style="margin-top:10px;" onclick="addItem()">+ 增加項目</button>
+                
+                <div class="total-section">
+                    <span class="internal-total">預估總毛利: <span id="display_profit">$0</span></span>
+                    未稅: <span id="display_sub">$0</span> | 
+                    稅金(<input type="number" id="q_tax_rate" value="5" style="width:45px; padding:2px; text-align:center; border:1px solid #ccc; border-radius:4px; font-weight:bold;" oninput="calcTotal()">%): 
+                    <span id="display_tax">$0</span> | 
+                    總計: <span id="display_total">$0</span>
+                </div>
+            </div>
+
+            <div class="form-group"><label>備註條款</label><textarea id="q_note" rows="15"></textarea></div>
+
+            <div style="margin-top:20px;">
+                <button class="btn btn-primary">💾 儲存 (同步至雲端)</button>
+                <button type="button" class="btn btn-outline" onclick="resetForm()">🔄 清空</button>
+            </div>
+        </form>
+    </details>
+
+    <hr style="margin: 25px 0;">
+
+    <div class="filter-bar">
+        <div class="form-group"><label>日期起</label><input type="date" id="filter_start" onchange="renderList()"></div>
+        <div class="form-group"><label>日期迄</label><input type="date" id="filter_end" onchange="renderList()"></div>
+        <div class="form-group"><label>狀態</label>
+            <select id="filter_status" onchange="renderList()">
+                <option value="all">全部</option>
+                <option value="converted">✅ 已轉訂單</option>
+                <option value="unconverted">⬜ 未轉訂單</option>
+            </select>
+        </div>
+        <div class="form-group" style="flex:1;">
+            <label>搜尋</label><input type="text" id="searchInput" placeholder="搜尋專案、客戶..." oninput="renderList()">
+        </div>
+    </div>
+
+    <table id="listTable">
+        <thead>
+            <tr>
+                <th onclick="sortList('id')" style="width:90px;">單號(預覽) <span id="sort_id" class="sort-icon">▼</span></th>
+                <th onclick="sortList('date')">日期 <span id="sort_date" class="sort-icon"></span></th>
+                <th onclick="sortList('cust')">客戶 <span id="sort_cust" class="sort-icon"></span></th>
+                <th onclick="sortList('proj')">專案 <span id="sort_proj" class="sort-icon"></span></th>
+                <th onclick="sortList('total')">總額 <span id="sort_total" class="sort-icon"></span></th>
+                <th onclick="sortList('converted')">狀態 <span id="sort_converted" class="sort-icon"></span></th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="quoteListBody"></tbody>
+    </table>
+</div>
+
+<div id="matModal" class="mat-modal">
+    <div class="mat-content">
+        <div class="mat-header">
+            <h3 style="margin:0; color:#4338ca;">🛠️ 項目與材料資料庫 (標準報價)</h3>
+            <button class="btn btn-danger btn-sm" onclick="closeMatModal()">✕ 關閉</button>
+        </div>
+
+        <div class="mat-form-row">
+            <input type="hidden" id="m_id">
+            <div class="form-group">
+                <label>項目名稱</label>
+                <input type="text" id="m_name" placeholder="例如: 5mm壓克力">
+            </div>
+            <div class="form-group">
+                <label>單位</label>
+                <input type="text" id="m_unit" list="unitList" placeholder="式/才/組">
+            </div>
+            <div class="form-group">
+                <label>標準單價 ($)</label>
+                <input type="number" id="m_price" placeholder="報價">
+            </div>
+            <div class="form-group">
+                <label>預估成本 ($)</label>
+                <input type="number" id="m_cost" placeholder="底價">
+            </div>
+            <div class="form-group">
+                <label>預覽毛利</label>
+                <input type="text" id="m_profit" disabled style="background:#f1f5f9; border:none; font-weight:bold;" placeholder="%">
+            </div>
+            <button class="btn btn-success" onclick="saveMaterial()">💾 儲存</button>
+        </div>
+
+        <div style="margin-bottom:10px; display:flex; gap:10px;">
+            <input type="text" id="m_search" placeholder="🔍 搜尋項目..." oninput="renderMatTable()" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:4px;">
+        </div>
+
+        <div class="mat-table-container">
+            <table class="mat-table">
+                <thead>
+                    <tr>
+                        <th width="35%">項目名稱</th>
+                        <th width="10%">單位</th>
+                        <th width="15%">標準單價</th>
+                        <th width="15%">成本</th>
+                        <th width="10%">毛利率</th>
+                        <th width="15%">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="matListBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<datalist id="cloudCustList"></datalist>
+<datalist id="custContactList"></datalist> 
+<datalist id="prodList"></datalist>
+<datalist id="unitList"><option value="式"><option value="組"><option value="件"><option value="個"><option value="才"><option value="樘"><option value="支"><option value="台"><option value="公分"></datalist>
+
+<script>
+    let API_URL = '';
+    const DEFAULT_PRODUCTS = ["PP亮","PP霧","PVC霧","PVC亮","全透亮","全透霧","半透亮","半透霧","雙透布","單透布","油畫布","斜紋布","合成板","強光板","發泡板","中空板","無接縫","壓克力","立體發光字","霓虹燈字","招牌燈箱","壓克力燈箱"];
+    const DEFAULT_NOTE = `以上報價為不含美編 (請自備完整可印刷美工電子檔)【檔案請自行做好再發印，恕本公司無法協助修改】
+★本報價單經雙方確認簽章後,即可視為正式訂單.具有法律效力，本公司報價人員如有報價錯誤，本公司得以保留接單與否之權利。
+★下單前. 請詳閱本公司官網的"注意事項"
+輸出注意事項可連結 http://www.yufudesign.com.tw/?urlid=webpage&sn=12
+★合版印刷. 每次進紙. 厚度多少有些誤差..若無法接受 另外估價
+★大圖輸出時, 本公司尺寸僅多1cm預留誤差, 若現場施工發現尺寸不足, 費用需自行負擔。
+★施工現場驗收時,請由權責主管或委任設計師,其一方到場驗收,如當天未能驗收完畢,
+須另外酌收車馬費$1700元整。
+★檔案如非方形，需要額外割型，請於檔案內畫好割型的刀模框線，否則檔案將無法印製。
+★本報價為7天內有效(含例假日)
+★ ★付款後製作★ ★（匯款產生之任何手續費需由客戶端自行擔付）
+轉帳資料~
+第一銀行 埔墘分行 (007)
+戶名：譽富國際有限公司
+帳號：238-100-65601
+*如蒙惠顧，請於下方確認簽名蓋章，mail或LINE回覆，謝謝`;
+    
+    const COMPANY_INFO = { title: "譽富國際有限公司", details: "統一編號：54036027 | 電話：(02) 2959-9137" };
+
+    let db = { quotes: [], products: [...DEFAULT_PRODUCTS], materials: [] }; 
+    let cloudDB = {}; 
+    let sortState = { field: 'id', dir: 'desc' };
+    let stampData = '民生公司發票章1.png';
+    let currentQuoteContacts = []; 
+
+    window.onload = function() {
+        const savedUrl = localStorage.getItem('erp_api_url');
+        if(savedUrl) { API_URL = savedUrl; syncCloudData(); }
+        
+        db = { quotes: [], products: [...DEFAULT_PRODUCTS], materials: [] }; 
+        document.getElementById('filter_start').value = '';
+        document.getElementById('filter_end').value = '';
+        updateProdList();
+        resetForm();
+        try { const savedStamp = localStorage.getItem('erp_stamp_img'); if(savedStamp) stampData = savedStamp; } catch(e) {}
+    };
+
+    function openConfigModal() { document.getElementById('apiUrlInput').value = API_URL; document.getElementById('configModal').style.display = 'flex'; }
+    function saveConfig() {
+        const u = document.getElementById('apiUrlInput').value.trim();
+        if(u) { API_URL = u; localStorage.setItem('erp_api_url', u); document.getElementById('configModal').style.display='none'; syncCloudData(); }
+    }
+
+    function saveToLocal() { try { localStorage.setItem('erp_quote_v17', JSON.stringify(db)); } catch(e) {} }
+
+    function loadStampManual(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                stampData = e.target.result;
+                localStorage.setItem('erp_stamp_img', stampData);
+                alert('✅ 印章載入成功！');
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function getLastPrice(productName) {
+        if (!productName || !db.quotes) return null;
+        for (const q of db.quotes) {
+            if (q.items && Array.isArray(q.items)) {
+                const found = q.items.find(i => i.desc === productName);
+                if (found) return found.price;
+            }
+        }
+        return null;
+    }
+
+    function autoFillPrice(el) {
+        const name = el.value.trim();
+        if(!name) return;
+
+        const row = el.closest('.item-row');
+        const priceInput = row.querySelector('.i-price');
+        const costInput = row.querySelector('.i-cost');
+        const unitInput = row.querySelector('.i-unit');
+
+        let dbMat = null;
+        if(db.materials) dbMat = db.materials.find(m => m.name === name);
+        const historyPrice = getLastPrice(name);
+
+        let finalPrice = null;
+        let finalUnit = null;
+        let finalCost = null;
+        let source = ''; 
+
+        if (dbMat) {
+            finalPrice = dbMat.price;
+            finalUnit = dbMat.unit;
+            finalCost = dbMat.cost; 
+            source = 'db'; 
+        } else if (historyPrice !== null) {
+            finalPrice = historyPrice;
+            source = 'hist'; 
+        }
+
+        if (finalPrice !== null) {
+            if (priceInput.value == '' || parseFloat(priceInput.value) !== parseFloat(finalPrice)) {
+                priceInput.value = finalPrice;
+                calcRow(priceInput); 
+                let color = source === 'db' ? '#dbeafe' : '#dcfce7'; 
+                priceInput.style.backgroundColor = color;
+                setTimeout(() => priceInput.style.backgroundColor = '', 1000);
+            }
+        }
+
+        if (finalCost !== null && (costInput.value == '' || costInput.value == '0')) {
+            costInput.value = finalCost;
+            calcRow(priceInput);
+            costInput.style.backgroundColor = '#ffedd5';
+            setTimeout(() => costInput.style.backgroundColor = 'var(--internal)', 1000);
+        }
+
+        if (finalUnit && (unitInput.value === '' || unitInput.value === '式')) {
+            unitInput.value = finalUnit;
+            unitInput.style.backgroundColor = '#fef3c7';
+            setTimeout(() => unitInput.style.backgroundColor = '', 1000);
+        }
+    }
+
+    function autoFillCust(name) {
+        if(!cloudDB.p) return;
+        const c = cloudDB.p.find(x => x.name === name);
+        if (c) {
+            document.getElementById('q_phone').value = c.phone || '';
+            document.getElementById('q_tax_id').value = c.tax || '';
+            document.getElementById('q_address').value = c.address || '';
+            const list = document.getElementById('custContactList');
+            list.innerHTML = '';
+            if(c.contacts && Array.isArray(c.contacts)) {
+                c.contacts.forEach(ct => { 
+                    if(ct.n) { const opt = document.createElement('option'); opt.value = ct.n; list.appendChild(opt); }
+                });
+            }
+        }
+    }
+
+    function autoFillContactPhone(name) {
+        const custName = document.getElementById('q_cust').value;
+        const c = cloudDB.p ? cloudDB.p.find(x => x.name === custName) : null;
+        const phoneInput = document.getElementById('q_contact_phone');
+        if (c && c.contacts) {
+            const target = c.contacts.find(ct => ct.n === name);
+            if (target && target.p) phoneInput.value = target.p;
+        }
+    }
+
+    function addContactTag() {
+        const nameInput = document.getElementById('q_contact_name');
+        const phoneInput = document.getElementById('q_contact_phone');
+        const name = nameInput.value.trim();
+        const phone = phoneInput.value.trim();
+        if(!name) return;
+        if(currentQuoteContacts.some(c => c.n === name && c.p === phone)) { alert('已加入'); return; }
+        currentQuoteContacts.push({ n: name, p: phone });
+        renderContactTags();
+        nameInput.value = ''; phoneInput.value = '';
+    }
+
+    function removeContactTag(idx) { currentQuoteContacts.splice(idx, 1); renderContactTags(); }
+    function renderContactTags() {
+        const div = document.getElementById('contactTags');
+        div.innerHTML = currentQuoteContacts.map((c, idx) => `<div class="c-tag">${c.n}${c.p ? ' ('+c.p+')' : ''} <span onclick="removeContactTag(${idx})">×</span></div>`).join('');
+    }
+
+    async function syncCloudData() {
+        const dot = document.getElementById('cloudDot');
+        const text = document.getElementById('cloudText');
+        dot.className = 'dot loading'; text.innerText = '下載中...';
+        
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            if(data) {
+                cloudDB = data; 
+                db.quotes = (cloudDB.q && Array.isArray(cloudDB.q)) ? cloudDB.q : [];
+                if(!cloudDB.p) cloudDB.p = [];
+                if(!cloudDB.o) cloudDB.o = [];
+                
+                if(data.materials && Array.isArray(data.materials)) {
+                    db.materials = data.materials;
+                } else {
+                    if(!db.materials) db.materials = [];
+                }
+
+                db.quotes.sort((a, b) => b.id - a.id);
+                renderList();
+                updateCustList();
+                updateProdList(); 
+
+                dot.className = 'dot ok'; text.innerText = `同步完成 (${db.quotes.length}單)`;
+                saveToLocal(); 
+            }
+        } catch(e) { 
+            console.error(e); 
+            dot.className = 'dot err'; text.innerText = '連線失敗'; 
+        }
+    }
+
+    async function pushToCloud(quoteData) {
+        const dot = document.getElementById('cloudDot');
+        const text = document.getElementById('cloudText');
+        text.innerText = '上傳中...'; dot.className = 'dot loading';
+        try {
+            const payload = { action: 'save_quote', data: quoteData, custData: cloudDB.p };
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
+            dot.className = 'dot ok'; text.innerText = '上傳成功';
+            await syncCloudData(); 
+        } catch(e) { 
+            dot.className = 'dot err'; text.innerText = '上傳失敗'; 
+            alert('❌ 上傳失敗，請檢查網路！'); 
+        }
+    }
+
+    function updateCustList() { if(cloudDB.p) document.getElementById('cloudCustList').innerHTML = cloudDB.p.map(c => `<option value="${c.name}">`).join(''); }
+    
+    function updateProdList() {
+        const allItems = new Set(db.products || []);
+        if (db.materials) {
+            db.materials.forEach(m => { if(m.name) allItems.add(m.name); });
+        }
+        const list = document.getElementById('prodList');
+        if(list) {
+            const sorted = Array.from(allItems).sort();
+            list.innerHTML = sorted.map(p => `<option value="${p}">`).join('');
+        }
+    }
+
+    async function saveQuote() {
+        const dot = document.getElementById('cloudDot');
+        if(dot.className.includes('loading')) { alert('同步中...'); return; }
+
+        const id = document.getElementById('q_id').value;
+        const custName = document.getElementById('q_cust').value;
+        const phone = document.getElementById('q_phone').value;
+        const taxId = document.getElementById('q_tax_id').value;
+        const address = document.getElementById('q_address').value;
+        
+        const pendingName = document.getElementById('q_contact_name').value.trim();
+        const pendingPhone = document.getElementById('q_contact_phone').value.trim();
+        if(pendingName && !currentQuoteContacts.some(c => c.n === pendingName && c.p === pendingPhone)) {
+            currentQuoteContacts.push({ n: pendingName, p: pendingPhone });
+        }
+        
+        const contactStr = currentQuoteContacts.map(c => c.n + (c.p ? '('+c.p+')' : '')).join('、');
+
+        if(!custName) return alert('請輸入客戶名稱');
+
+        document.querySelectorAll('.i-desc').forEach(input => {
+            const val = input.value.trim();
+            if(val && !db.products.includes(val)) db.products.push(val);
+        });
+        updateProdList();
+
+        if(!cloudDB.p) cloudDB.p = [];
+        let p = cloudDB.p.find(x => x.name === custName);
+        if (!p) {
+            const newContacts = currentQuoteContacts.map(c => ({ n: c.n, p: c.p || '', l: '' }));
+            cloudDB.p.push({ id: Date.now(), name: custName, type: 'c', phone: phone, tax: taxId, address: address, contact: contactStr, contacts: newContacts });
+        } else {
+            p.phone = phone; p.tax = taxId; p.address = address; p.contact = contactStr;
+            if(!p.contacts) p.contacts = [];
+            currentQuoteContacts.forEach(newC => {
+                const existing = p.contacts.find(pc => pc.n === newC.n);
+                if (existing) { if (newC.p) existing.p = newC.p; } 
+                else { p.contacts.push({ n: newC.n, p: newC.p || '', l: '' }); }
+            });
+        }
+
+        let items=[]; 
+        document.querySelectorAll('.item-row').forEach(r=>{ 
+            items.push({ 
+                desc: r.querySelector('.i-desc').value, 
+                spec: r.querySelector('.i-spec').value,
+                w: r.querySelector('.i-w').value, h: r.querySelector('.i-h').value, 
+                unit: r.querySelector('.i-unit').value, 
+                tal: r.querySelector('.i-tal').value, qty: r.querySelector('.i-qty').value, 
+                cost: parseFloat(r.querySelector('.i-cost').value)||0, 
+                price: r.querySelector('.i-price').value, amt: parseFloat(r.querySelector('.i-amt').value)||0 
+            }); 
+        });
+        
+        const {sub, tax, total, taxRate} = calcTotal();
+        const q = { 
+            id: id?parseInt(id):Date.now(), 
+            date: document.getElementById('q_date').value, 
+            valid: document.getElementById('q_valid').value, 
+            proj: document.getElementById('q_proj').value, 
+            cust: custName, phone, taxId, contact: contactStr, address, 
+            items, subtotal: sub, tax, total, taxRate, 
+            note: document.getElementById('q_note').value,
+            converted: false 
+        };
+        
+        if(id) { 
+            const idx=db.quotes.findIndex(x=>x.id==id); 
+            if(idx!==-1) { q.converted = db.quotes[idx].converted; db.quotes[idx]=q; }
+        } else {
+            db.quotes.unshift(q);
+        }
+        
+        saveToLocal();
+        await pushToCloud(q);
+        
+        renderList(); 
+        resetForm();
+        alert('✅ 儲存成功！');
+    }
+
+    async function convertToOrder(quoteId) {
+        const q = db.quotes.find(x => x.id == quoteId);
+        
+        if(!q) return alert('找不到此報價單資料');
+        if(q.converted && !confirm('此報價單已轉過訂單，要再次轉單嗎？')) return;
+        if(!confirm(`確定將報價單 #${q.id} 轉為正式訂單？\n(將寫入雲端 ERP)`)) return;
+
+        const newOrder = {
+            id: Date.now(), 
+            date: q.date, 
+            proj: q.proj, 
+            cust: q.cust, 
+            taxId: q.taxId || "", 
+            contact: q.contact, 
+            phone: q.phone, 
+            address: q.address,
+            invoice: '無', invNum: '', 
+            price: q.total, base: q.subtotal, tax: q.tax, 
+            deposit: 0, pay: '未收款', bank: '', 
+            note: `[由報價單 #${q.id} 轉入] ${q.note}`, 
+            items: q.items ? q.items.map(i => {
+                let finalName = i.desc || '';
+                if (i.spec) finalName = finalName ? `${finalName} (${i.spec})` : i.spec;
+                return { 
+                    name: finalName, 
+                    spec: i.spec, 
+                    w: i.w, h: i.h, 
+                    unit: i.unit, 
+                    qty: i.qty, 
+                    price: i.price, 
+                    cost: i.cost || 0, 
+                    amt: i.amt 
+                };
+            }) : [],
+            subs: [] 
+        };
+
+        const dot = document.getElementById('cloudDot');
+        const text = document.getElementById('cloudText');
+        if(text) text.innerText = '讀取雲端訂單...';
+        if(dot) dot.className = 'dot loading';
+
+        try {
+            const res = await fetch(API_URL);
+            const cloudData = await res.json();
+            
+            let currentOrders = (cloudData && cloudData.o && Array.isArray(cloudData.o)) ? cloudData.o : [];
+            currentOrders.unshift(newOrder);
+            
+            if(text) text.innerText = '正在寫入 ERP...';
+            
+            await fetch(API_URL, { 
+                method: 'POST', 
+                body: JSON.stringify({ action: 'save_erp', orders: currentOrders }) 
+            });
+            
+            q.converted = true;
+            await pushToCloud(q); 
+
+            alert('✅ 轉單成功！資料已寫入 ERP 系統。');
+            if(dot) dot.className = 'dot ok';
+            if(text) text.innerText = '完成';
+            
+            renderList();
+
+        } catch(e) {
+            console.error(e);
+            alert('❌ 轉單失敗，請檢查網路連線。');
+            if(dot) dot.className = 'dot err';
+            if(text) text.innerText = '失敗';
+        }
+    }
+
+    function addItem(desc='', spec='', w='', h='', qty=1, price=0, unit='式', amt=0, cost=0) {
+        const div = document.createElement('div'); 
+        div.className = 'item-grid-layout item-row';
+        
+        div.innerHTML = `
+            <div class="ai-wrapper" style="position: relative; display: flex; align-items: center; width: 100%;">
+                <input type="text" class="i-desc" list="prodList" value="${desc}" 
+                       onchange="autoFillPrice(this)" 
+                       style="width:100%; padding-right:35px;" placeholder="輸入品名...">
+                <button type="button" class="btn-ai-analyze" onclick="showPriceAnalysis(this)" title="AI 分析" style="position: absolute; right: 5px; background: none; border: none; cursor: pointer; font-size: 18px; z-index: 10;">🧠</button>
+            </div>
+
+            <input type="text" class="i-spec" value="${spec}" oninput="parseSpecSize(this)" placeholder="例: 120x60">
+            
+            <input type="number" class="i-w" value="${w}" oninput="calcRow(this)">
+            <input type="number" class="i-h" value="${h}" oninput="calcRow(this)">
+            <input type="text" class="i-unit" list="unitList" value="${unit}">
+            <input type="text" class="i-tal" readonly style="background:#eee; text-align:center;">
+            <input type="number" class="i-qty" value="${qty}" oninput="calcRow(this)">
+            
+            <input type="number" class="i-cost internal-col" value="${cost}" placeholder="成本" oninput="calcRow(this)">
+            <input type="text" class="i-profit profit-col" readonly tabindex="-1" placeholder="利潤">
+
+            <input type="number" class="i-price" value="${price}" oninput="calcRow(this)">
+            <input type="number" class="i-amt" value="${amt || 0}" onchange="calcTotal()">
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove(); calcTotal()">X</button>
+        `;
+        document.getElementById('itemContainer').appendChild(div); 
+        if(w || h || price || cost) calcRow(div.querySelector('.i-w'), amt > 0);
+    }
+
+    function calcRow(el, preserveAmt = false) {
+        const row = el.closest('.item-row');
+        const w = parseFloat(row.querySelector('.i-w').value)||0, h = parseFloat(row.querySelector('.i-h').value)||0;
+        const qty = parseFloat(row.querySelector('.i-qty').value)||0, price = parseFloat(row.querySelector('.i-price').value)||0;
+        const cost = parseFloat(row.querySelector('.i-cost').value)||0; 
+        
+        let tal = 0;
+        if(w>0 && h>0) {
+            tal = Math.ceil((w*h)/900); if(tal<1) tal=1; 
+            row.querySelector('.i-tal').value = tal;
+        } else { row.querySelector('.i-tal').value = '-'; }
+        
+        const multiplier = tal > 0 ? tal : 1;
+
+        if(!preserveAmt) {
+            const sub = Math.round(price * multiplier * qty);
+            row.querySelector('.i-amt').value = sub;
+        }
+
+        const profit = Math.round((price - cost) * multiplier * qty);
+        const profitEl = row.querySelector('.i-profit');
+        profitEl.value = profit;
+        
+        if(profit < 0) profitEl.style.color = 'red';
+        else profitEl.style.color = '#15803d';
+
+        calcTotal();
+    }
+
+    function calcTotal() {
+        let sub = 0; 
+        let totalProfit = 0;
+
+        document.querySelectorAll('.item-row').forEach(row => {
+            sub += (parseFloat(row.querySelector('.i-amt').value)||0);
+            totalProfit += (parseFloat(row.querySelector('.i-profit').value)||0);
+        });
+        
+        const rateInput = document.getElementById('q_tax_rate');
+        const rate = rateInput ? parseFloat(rateInput.value) : 5;
+        const tax = Math.round(sub * (rate / 100));
+        
+        document.getElementById('display_sub').innerText = '$'+sub.toLocaleString();
+        document.getElementById('display_tax').innerText = '$'+tax.toLocaleString();
+        document.getElementById('display_total').innerText = '$'+(sub+tax).toLocaleString();
+        document.getElementById('display_profit').innerText = '$'+totalProfit.toLocaleString(); 
+        
+        return { sub, tax, total: sub+tax, taxRate: rate };
+    }
+
+    function resetForm() {
+        document.getElementById('quoteForm').reset(); document.getElementById('q_id').value=''; 
+        document.getElementById('q_date').valueAsDate=new Date(); 
+        document.getElementById('q_note').value=DEFAULT_NOTE; 
+        document.getElementById('q_tax_rate').value = 5;
+        document.getElementById('itemContainer').innerHTML=''; 
+        currentQuoteContacts = []; renderContactTags();
+        addItem(); calcTotal();
+    }
+
+    function renderList() {
+        const key = document.getElementById('searchInput').value.toLowerCase();
+        const start = document.getElementById('filter_start').value;
+        const end = document.getElementById('filter_end').value;
+        const status = document.getElementById('filter_status').value;
+
+        let list = db.quotes.filter(q => {
+            const inDate = (!start || q.date >= start) && (!end || q.date <= end);
+            const inStatus = (status === 'all') || (status === 'converted' && q.converted) || (status === 'unconverted' && !q.converted);
+            const inKey = (q.cust + q.proj + (q.id||'')).toLowerCase().includes(key);
+            return inDate && inStatus && inKey;
+        });
+
+        list.sort((a, b) => {
+            let valA = a[sortState.field], valB = b[sortState.field];
+            if(sortState.field==='total'||sortState.field==='id') return sortState.dir==='asc'? valA-valB : valB-valA;
+            return sortState.dir==='asc'? String(valA).localeCompare(String(valB)) : String(valB).localeCompare(String(valA));
+        });
+
+        document.getElementById('quoteListBody').innerHTML = list.map(q => `
+            <tr>
+                <td style="color:var(--primary); font-weight:bold; cursor:pointer;" onmouseenter="previewQuote(${q.id})" title="預覽">#${q.id} 👁️</td>
+                <td>${q.date}</td><td>${q.cust}</td><td>${q.proj}</td>
+                <td>$${(q.total||0).toLocaleString()}</td>
+                <td><span class="badge ${q.converted?'bg-green':'bg-gray'}">${q.converted?'已轉訂單':'未轉訂單'}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-warning" onclick="copyQuote('${q.id}')" title="複製">📋</button>
+                    <button class="btn btn-sm btn-outline" onclick="editQuote('${q.id}')" title="編輯">✏️</button>
+                    <button class="btn btn-sm btn-primary" onclick="printQuote('${q.id}', 'pdf')" title="列印PDF">🖨️</button>
+                    <button class="btn btn-sm btn-success" onclick="printQuote('${q.id}', 'jpg')" title="轉存JPG">🖼️</button>
+                    <button class="btn btn-sm btn-purple" onclick="convertToOrder('${q.id}')" title="轉訂單">☁️</button>
+                    <button class="btn btn-sm btn-danger" onclick="delQuote('${q.id}')" title="刪除">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function editQuote(id) { 
+        const q=db.quotes.find(x=>x.id==id); if(!q)return; 
+        document.getElementById('q_id').value=q.id; 
+        document.getElementById('q_date').value=q.date; 
+        document.getElementById('q_valid').value=q.valid||''; 
+        document.getElementById('q_proj').value=q.proj; 
+        document.getElementById('q_cust').value=q.cust; 
+        
+        currentQuoteContacts = [];
+        if (q.contact) {
+            const parts = q.contact.split('、');
+            parts.forEach(str => {
+                const match = str.match(/^(.*?)\((.*?)\)$/);
+                if (match) currentQuoteContacts.push({ n: match[1], p: match[2] });
+                else currentQuoteContacts.push({ n: str, p: '' });
+            });
+        }
+        renderContactTags();
+
+        document.getElementById('q_phone').value=q.phone||''; 
+        document.getElementById('q_address').value=q.address||''; 
+        document.getElementById('q_tax_id').value=q.taxId||''; 
+        document.getElementById('q_note').value=q.note; 
+        document.getElementById('q_tax_rate').value = (q.taxRate !== undefined) ? q.taxRate : 5;
+
+        document.getElementById('itemContainer').innerHTML=''; 
+        if(q.items) q.items.forEach(i=>addItem(i.desc,i.spec,i.w,i.h,i.qty,i.price, i.unit, i.amt, i.cost)); 
+        calcTotal();
+        document.querySelector('details').open = true; window.scrollTo(0,0); 
+    }
+
+    function generatePrintHTML(q) {
+        const itemsHtml = (q.items || []).map((i,idx)=>`<tr><td align="center">${idx+1}</td><td>${i.desc}</td><td>${i.spec||''}</td><td align="center">${i.w?i.w+'x'+i.h:'-'}</td><td align="center">${i.qty}</td><td align="center">${i.unit||'式'}</td><td align="right">${parseFloat(i.price).toLocaleString()}</td><td align="right">${parseFloat(i.amt).toLocaleString()}</td></tr>`).join('');
+        const taxText = `營業稅 (${(q.taxRate !== undefined ? q.taxRate : 5)}%)`;
+
+        return `
+            <div class="print-header">
+                <div class="company-title">${COMPANY_INFO.title}</div>
+                <div class="company-info">${COMPANY_INFO.details.replace(/\n/g, '<br>')}</div>
+            </div>
+            <div style="text-align:center; font-size:24px; font-weight:bold; margin:15px 0;">報 價 單</div>
+            <div class="quote-info-grid">
+                <div style="width:60%">
+                    <div class="info-row"><span class="info-label">客戶名稱：</span><span>${q.cust}</span></div>
+                    <div class="info-row"><span class="info-label">聯絡人：</span><span>${q.contact || ''}</span></div>
+                    <div class="info-row"><span class="info-label">電話：</span><span>${q.phone || ''}</span></div>
+                    <div class="info-row"><span class="info-label">地址：</span><span>${q.address || ''}</span></div>
+                    <div class="info-row"><span class="info-label">統編：</span><span>${q.taxId || ''}</span></div>
+                </div>
+                <div style="width:35%; text-align:right;">
+                    <div class="info-row" style="justify-content:flex-end;"><span class="info-label">單號：</span><span>#${q.id}</span></div>
+                    <div class="info-row" style="justify-content:flex-end;"><span class="info-label">日期：</span><span>${q.date}</span></div>
+                    <div class="info-row" style="justify-content:flex-end;"><span class="info-label">專案：</span><span>${q.proj}</span></div>
+                </div>
+            </div>
+            <table class="print-table">
+                <thead><tr><th>#</th><th>項目</th><th>規格</th><th>尺寸</th><th>量</th><th>單位</th><th>單價</th><th>金額</th></tr></thead>
+                <tbody>${itemsHtml}</tbody>
+                <tfoot>
+                    <tr><td colspan="7" align="right">合計 (未稅)</td><td align="right">${(q.subtotal||0).toLocaleString()}</td></tr>
+                    <tr><td colspan="7" align="right">${taxText}</td><td align="right">${(q.tax||0).toLocaleString()}</td></tr>
+                    <tr><td colspan="7" align="right" style="font-weight:bold;">總計 (含稅)</td><td align="right" style="font-weight:bold;">NT$ ${(q.total||0).toLocaleString()}</td></tr>
+                </tfoot>
+            </table>
+            <div style="border:1px solid #000; padding:10px; font-size:12px; min-height:60px;"><strong>備註：</strong><br><pre style="font-family:inherit; white-space: pre-wrap; margin:0;">${q.note}</pre></div>
+            
+            <div class="signature-section">
+                <div class="sign-box">
+                    <div class="sign-title">客戶簽章</div>
+                    <div class="sign-placeholder">(簽名回傳)</div>
+                </div>
+                <div class="sign-box" onclick="document.getElementById('stampLoader').click()">
+                    <div class="sign-title">業務簽章</div>
+                    <img src="${stampData}" class="stamp-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div class="stamp-alt-text">❌ 點擊載入印章</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function previewQuote(id) {
+        const q = db.quotes.find(x => x.id == id); if(!q) return;
+        const m = document.getElementById('previewModal');
+        m.innerHTML = generatePrintHTML(q) + `<div style="text-align:center;margin-top:10px;"><button class="btn btn-danger" onclick="closePreview()">關閉</button></div>`;
+        m.style.display = 'block'; document.getElementById('previewOverlay').style.display = 'block';
+    }
+    function closePreview() { document.getElementById('previewModal').style.display = 'none'; document.getElementById('previewOverlay').style.display = 'none'; }
+
+    async function printQuote(id, type) {
+        const q = db.quotes.find(x => x.id == id);
+        const div = document.getElementById('printArea');
+        div.innerHTML = generatePrintHTML(q);
+        if(type === 'pdf') window.print();
+        else if(type === 'jpg') {
+            div.style.display = 'block';
+            try {
+                const imgs = div.querySelectorAll('img');
+                await Promise.all(Array.from(imgs).map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+                }));
+                const canvas = await html2canvas(div, { scale: 2, useCORS: true, allowTaint: true });
+                const link = document.createElement('a'); link.download = `報價單_${q.cust}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.9); link.click();
+            } catch(e) { console.error(e); alert('圖片產生失敗'); } finally { div.style.display = 'none'; }
+        }
+    }
+    
+    function exportData() { const a=document.createElement('a'); a.href="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)); a.download="ERP_Quote_Cloud_Backup.json"; a.click(); }
+
+    async function importData(input) {
+        const f = input.files[0];
+        if(!f) return;
+        
+        const r = new FileReader();
+        r.onload = async function(e) {
+            try {
+                let content = JSON.parse(e.target.result);
+                if (content.quotes && !content.q) { content.q = content.quotes; delete content.quotes; }
+                if(!confirm("⚠️ 嚴重警告：將覆蓋雲端資料！確定嗎？")) return;
+                
+                await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'FULL_RESTORE', allData: content }) });
+                alert('✅ 還原成功！'); location.reload();
+            } catch(err) { alert('❌ 失敗'); }
+        };
+        r.readAsText(f);
+        input.value = ''; 
+    }
+
+    function showPriceAnalysis(btn) {
+        const wrapper = btn.parentElement;
+        const input = wrapper.querySelector('input.i-desc');
+        if (!input) return;
+        const productName = input.value.trim();
+        if(!productName) return alert("請先輸入品名");
+
+        const oldCard = document.querySelector('.price-analysis-card'); if(oldCard) oldCard.remove();
+
+        let dbMat = null;
+        let suggestedPrice = null;
+        let costPrice = null;
+        if(db.materials) {
+            dbMat = db.materials.find(m => m.name === productName);
+            if(dbMat) {
+                costPrice = dbMat.cost;
+                suggestedPrice = dbMat.price > 0 ? dbMat.price : Math.round(dbMat.cost * 1.3);
+            }
+        }
+
+        const card = document.createElement('div');
+        card.className = 'price-analysis-card';
+        let suggestHtml = '';
+        if (suggestedPrice) {
+            let profitRate = costPrice > 0 ? Math.round(((suggestedPrice - costPrice)/suggestedPrice)*100) : 0;
+            suggestHtml = `
+                <div style="background:#ecfdf5; padding:10px; border-bottom:1px solid #d1fae5;">
+                    <div style="font-size:12px; color:#047857; font-weight:bold;">💡 AI 建議售價</div>
+                    <div style="font-size:20px; font-weight:900; color:#059669; display:flex; justify-content:space-between; align-items:end;">
+                        $${suggestedPrice.toLocaleString()}
+                        <span style="font-size:11px; color:#666;">預估毛利: ${profitRate}%</span>
+                    </div>
+                    ${costPrice ? `<div style="font-size:10px; color:#666;">(成本: $${costPrice.toLocaleString()})</div>` : ''}
+                </div>`;
+        } else {
+            suggestHtml = `<div style="padding:10px; background:#f9fafb; font-size:12px; color:#666;">ℹ️ 無成本資料。請至「材料庫」建立。</div>`;
+        }
+
+        card.innerHTML = `
+            <div style="background:#6366f1; color:white; padding:8px 12px; font-weight:bold; display:flex; justify-content:space-between;">
+                <span>🧠 分析：${productName}</span>
+                <span style="cursor:pointer;" onclick="this.parentElement.parentElement.remove()">✕</span>
+            </div>
+            ${suggestHtml}
+        `;
+        document.body.appendChild(card);
+        const rect = input.getBoundingClientRect();
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        card.style.top = (rect.bottom + scrollTop + 5) + 'px';
+        card.style.left = (rect.left + scrollLeft) + 'px';
+        setTimeout(() => {
+            const closer = function(e) { if(!card.contains(e.target) && e.target !== btn) { card.remove(); document.removeEventListener('click', closer); }};
+            document.addEventListener('click', closer);
+        }, 100);
+    }
+
+    function parseSpecSize(el) {
+        const val = el.value.trim(); if(!val) return;
+        const regex = /(\d+(?:\.\d+)?)\s*(mm|cm|m|in|inch|ft|寸|吋|尺|呎|公分|公釐|公尺)?\s*[xX*]\s*(\d+(?:\.\d+)?)\s*(mm|cm|m|in|inch|ft|寸|吋|尺|呎|公分|公釐|公尺)?/i;
+        const match = val.match(regex);
+        if (match) {
+            let num1 = match[1], unit1 = match[2], num2 = match[3], unit2 = match[4];
+            if (!unit1 && unit2) unit1 = unit2;
+            const finalW = convertToCm(num1, unit1);
+            const finalH = convertToCm(num2, unit2);
+            const row = el.closest('.item-row');
+            const wInput = row.querySelector('.i-w'), hInput = row.querySelector('.i-h');
+            if (parseFloat(wInput.value) !== parseFloat(finalW.toFixed(1)) || parseFloat(hInput.value) !== parseFloat(finalH.toFixed(1))) {
+                wInput.value = parseFloat(finalW.toFixed(1)); hInput.value = parseFloat(finalH.toFixed(1));
+                wInput.style.backgroundColor = '#fef08a'; hInput.style.backgroundColor = '#fef08a';
+                setTimeout(() => { wInput.style.backgroundColor = ''; hInput.style.backgroundColor = ''; }, 800);
+                calcRow(wInput);
+            }
+        }
+    }
+    function convertToCm(value, unit) {
+        if (!unit) return parseFloat(value);
+        unit = unit.toLowerCase().trim(); const v = parseFloat(value);
+        if (unit.match(/mm|公釐/)) return v / 10;
+        if (unit.match(/cm|公分/)) return v;
+        if (unit.match(/m|公尺/)) return v * 100;
+        if (unit.match(/in|inch|寸|吋/)) return v * 2.54;
+        if (unit.match(/ft|feet|尺|呎/)) return v * 30.48;
+        return v;
+    }
+
+    async function saveMaterial() {
+        const id = document.getElementById('m_id').value;
+        const name = document.getElementById('m_name').value.trim();
+        const unit = document.getElementById('m_unit').value.trim();
+        const price = parseFloat(document.getElementById('m_price').value) || 0;
+        const cost = parseFloat(document.getElementById('m_cost').value) || 0;
+        if(!name) return alert('請輸入名稱');
+        if(!db.materials) db.materials = [];
+        const newMat = { id: id ? parseInt(id) : Date.now(), name, unit, price, cost };
+        if(id) { const idx = db.materials.findIndex(m => m.id == id); if(idx !== -1) db.materials[idx] = newMat; } 
+        else { db.materials.unshift(newMat); if(!db.products.includes(name)) db.products.push(name); }
+        renderMatTable(); resetMatForm(); updateProdList(); 
+        
+        try {
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'save_materials', materials: db.materials }) });
+            alert('✅ 儲存並同步成功！');
+        } catch(e) { alert('⚠️ 本地已存，但雲端同步失敗'); }
+        saveToLocal();
+    }
+    
+    function renderMatTable() {
+        const key = document.getElementById('m_search').value.toLowerCase();
+        const list = (db.materials || []).filter(m => m.name.toLowerCase().includes(key));
+        document.getElementById('matListBody').innerHTML = list.map(m => {
+            let profit = m.price - m.cost;
+            let margin = m.price > 0 ? Math.round((profit / m.price) * 100) : 0;
+            let marginClass = margin < 20 ? 'profit-low' : 'profit-high';
+            return `<tr><td>${m.name}</td><td>${m.unit || '-'}</td><td>$${m.price}</td><td style="color:#64748b;">$${m.cost}</td><td class="${marginClass}">${margin}%</td><td><button class="btn btn-sm btn-primary" onclick="editMat(${m.id})">✎</button><button class="btn btn-sm btn-danger" onclick="delMat(${m.id})">🗑️</button></td></tr>`;
+        }).join('');
+    }
+    function openMatModal() { document.getElementById('matModal').style.display = 'flex'; renderMatTable(); }
+    function closeMatModal() { document.getElementById('matModal').style.display = 'none'; resetMatForm(); }
+    function resetMatForm() { document.getElementById('m_id').value = ''; document.getElementById('m_name').value = ''; document.getElementById('m_unit').value = ''; document.getElementById('m_price').value = ''; document.getElementById('m_cost').value = ''; document.getElementById('m_profit').value = ''; }
+    function editMat(id) { const m = db.materials.find(x => x.id == id); if(!m) return; document.getElementById('m_id').value = m.id; document.getElementById('m_name').value = m.name; document.getElementById('m_unit').value = m.unit; document.getElementById('m_price').value = m.price; document.getElementById('m_cost').value = m.cost; }
+    function delMat(id) { if(!confirm('確定刪除？')) return; db.materials = db.materials.filter(m => m.id !== id); saveToLocal(); renderMatTable(); }
+    
+    function copyQuote(id) {
+        const q = db.quotes.find(x => x.id == id); if(!q) return;
+        document.getElementById('q_id').value = ''; document.getElementById('q_date').valueAsDate = new Date(); document.getElementById('q_valid').value = '';
+        document.getElementById('q_proj').value = q.proj + " (複製)"; document.getElementById('q_cust').value = q.cust;
+        currentQuoteContacts = []; if (q.contact) { const parts = q.contact.split('、'); parts.forEach(str => { const match = str.match(/^(.*?)\((.*?)\)$/); if (match) currentQuoteContacts.push({ n: match[1], p: match[2] }); else currentQuoteContacts.push({ n: str, p: '' }); }); } renderContactTags();
+        document.getElementById('q_phone').value = q.phone || ''; document.getElementById('q_address').value = q.address || ''; document.getElementById('q_tax_id').value = q.taxId || ''; document.getElementById('q_note').value = q.note; document.getElementById('q_tax_rate').value = (q.taxRate !== undefined) ? q.taxRate : 5;
+        document.getElementById('itemContainer').innerHTML = '';
+        if(q.items) q.items.forEach(i => addItem(i.desc, i.spec, i.w, i.h, i.qty, i.price, i.unit, i.amt, i.cost));
+        calcTotal(); document.querySelector('details').open = true; window.scrollTo(0,0);
+        alert('📋 已複製！');
+    }
+    
+    async function delQuote(id) { 
+        if(!confirm('確定刪除？')) return;
+        db.quotes = db.quotes.filter(x => x.id != id); renderList(); 
+        try { await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'delete_item', type: 'q', id: id }) }); saveToLocal(); } catch(e) {}
+    }
+    function sortList(field) { if (sortState.field === field) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc'; else { sortState.field = field; sortState.dir = 'desc'; } renderList(); }
+</script>
+</body>
+</html>
